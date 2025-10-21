@@ -1,58 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Button from './Button';
-
-/**
- * Custom hook for managing tasks with localStorage persistence
- */
-const useLocalStorageTasks = () => {
-  // Initialize state from localStorage or with empty array
-  const [tasks, setTasks] = useState(() => {
-    const savedTasks = localStorage.getItem('tasks');
-    return savedTasks ? JSON.parse(savedTasks) : [];
-  });
-
-  // Update localStorage when tasks change
-  useEffect(() => {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-  }, [tasks]);
-
-  // Add a new task
-  const addTask = (text) => {
-    if (text.trim()) {
-      setTasks([
-        ...tasks,
-        {
-          id: Date.now(),
-          text,
-          completed: false,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    }
-  };
-
-  // Toggle task completion status
-  const toggleTask = (id) => {
-    setTasks(
-      tasks.map((task) =>
-        task.id === id ? { ...task, completed: !task.completed } : task
-      )
-    );
-  };
-
-  // Delete a task
-  const deleteTask = (id) => {
-    setTasks(tasks.filter((task) => task.id !== id));
-  };
-
-  return { tasks, addTask, toggleTask, deleteTask };
-};
+import Card from './Card';
+import { useTasks } from '../hooks/useLocalStorage';
 
 /**
  * TaskManager component for managing tasks
  */
 const TaskManager = () => {
-  const { tasks, addTask, toggleTask, deleteTask } = useLocalStorageTasks();
+  const { tasks, addTask, toggleTask, deleteTask, clearCompleted } = useTasks();
   const [newTaskText, setNewTaskText] = useState('');
   const [filter, setFilter] = useState('all');
 
@@ -71,8 +26,20 @@ const TaskManager = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <h2 className="text-2xl font-bold mb-6">Task Manager</h2>
+    <Card className="animate-fade-in">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Task Manager</h2>
+        {tasks.filter(task => task.completed).length > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={clearCompleted}
+            className="animate-bounce-gentle"
+          >
+            Clear Completed
+          </Button>
+        )}
+      </div>
 
       {/* Task input form */}
       <form onSubmit={handleSubmit} className="mb-6">
@@ -82,7 +49,7 @@ const TaskManager = () => {
             value={newTaskText}
             onChange={(e) => setNewTaskText(e.target.value)}
             placeholder="Add a new task..."
-            className="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+            className="input-field flex-grow"
           />
           <Button type="submit" variant="primary">
             Add Task
@@ -116,30 +83,41 @@ const TaskManager = () => {
       </div>
 
       {/* Task list */}
-      <ul className="space-y-2">
+      <div className="space-y-2">
         {filteredTasks.length === 0 ? (
-          <li className="text-gray-500 dark:text-gray-400 text-center py-4">
-            No tasks found
-          </li>
+          <div className="text-center py-8">
+            <div className="text-gray-400 dark:text-gray-500 mb-2">
+              <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <p className="text-gray-500 dark:text-gray-400">
+              {filter === 'all' ? 'No tasks yet. Add one above!' : `No ${filter} tasks found.`}
+            </p>
+          </div>
         ) : (
-          filteredTasks.map((task) => (
-            <li
+          filteredTasks.map((task, index) => (
+            <div
               key={task.id}
-              className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700"
+              className={`flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-700 transition-all duration-200 animate-slide-up`}
+              style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-1">
                 <input
                   type="checkbox"
                   checked={task.completed}
                   onChange={() => toggleTask(task.id)}
-                  className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                  className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                 />
                 <span
-                  className={`${
-                    task.completed ? 'line-through text-gray-500 dark:text-gray-400' : ''
-                  }`}
+                  className={`flex-1 ${
+                    task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'
+                  } transition-all duration-200`}
                 >
                   {task.text}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {new Date(task.createdAt).toLocaleDateString()}
                 </span>
               </div>
               <Button
@@ -147,21 +125,33 @@ const TaskManager = () => {
                 size="sm"
                 onClick={() => deleteTask(task.id)}
                 aria-label="Delete task"
+                className="ml-2"
               >
                 Delete
               </Button>
-            </li>
+            </div>
           ))
         )}
-      </ul>
+      </div>
 
       {/* Task stats */}
-      <div className="mt-6 text-sm text-gray-500 dark:text-gray-400">
-        <p>
-          {tasks.filter((task) => !task.completed).length} tasks remaining
-        </p>
+      <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex space-x-4">
+            <span>Total: {tasks.length}</span>
+            <span>Active: {tasks.filter(task => !task.completed).length}</span>
+            <span>Completed: {tasks.filter(task => task.completed).length}</span>
+          </div>
+          <div className="text-xs">
+            {tasks.length > 0 && (
+              <span>
+                {Math.round((tasks.filter(task => task.completed).length / tasks.length) * 100)}% complete
+              </span>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 };
 
